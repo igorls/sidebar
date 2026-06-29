@@ -7,7 +7,20 @@ const PRIVACY: Record<AsrProviderId, { tone: "cloud" | "private"; note: string }
   webspeech: { tone: "cloud", note: "Google" },
   elevenlabs: { tone: "cloud", note: "ElevenLabs" },
   "gemma-local": { tone: "private", note: "host GPU" },
+  "whisper-webgpu": { tone: "private", note: "your GPU" },
 };
+
+const LANGS: { code: string; label: string }[] = [
+  { code: "auto", label: "Auto" },
+  { code: "en-US", label: "English" },
+  { code: "pt-BR", label: "Português" },
+  { code: "es-ES", label: "Español" },
+  { code: "fr-FR", label: "Français" },
+  { code: "de-DE", label: "Deutsch" },
+  { code: "it-IT", label: "Italiano" },
+  { code: "ja-JP", label: "日本語" },
+  { code: "zh-CN", label: "中文" },
+];
 
 /** The shared bottom bar — every participant's own mic controls (host and guests alike). */
 export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarState }) {
@@ -33,6 +46,20 @@ export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarSta
           {providers.map((p) => (
             <option key={p.id} value={p.id} disabled={!p.available}>
               {p.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="asrSelect"
+          value={cap.lang}
+          disabled={cap.speechOn}
+          onChange={(e) => cap.setLang(e.target.value)}
+          aria-label="Spoken language"
+          title={cap.engine === "webspeech" ? "Web Speech can't auto-detect — set your spoken language" : "Spoken language (Auto = let the engine detect)"}
+        >
+          {LANGS.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}
             </option>
           ))}
         </select>
@@ -90,6 +117,7 @@ export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarSta
             Push-to-talk
           </button>
         </div>
+        {cap.status ? <span className="micStatus">{cap.status}</span> : null}
         {cap.error ? <span className="capError">{cap.error}</span> : null}
       </div>
 

@@ -3,6 +3,7 @@ import type { ClientEvent } from "@sidebar/shared";
 import {
   createAsrProvider,
   webSpeechAvailable,
+  probeWebgpu,
   GEMMA_VAD_DEFAULTS,
   type AsrProvider,
   type AsrProviderId,
@@ -20,11 +21,15 @@ export interface Capture {
   talking: boolean; // open mic on, or PTT currently held
   engine: AsrProviderId;
   setEngine: (id: AsrProviderId) => void;
+  lang: string;
+  setLang: (l: string) => void;
   mode: MicMode;
   setMode: (m: MicMode) => void;
   level: number;
   metric: AsrMetrics | null;
   error: string;
+  /** Engine setup status (e.g. Whisper model download/warm-up). */
+  status: string;
   start: () => Promise<void>;
   stop: () => void;
   pttDown: () => void;
@@ -50,13 +55,16 @@ const isTyping = (el: Element | null): boolean =>
 
 export function useCapture(send: (e: ClientEvent) => void): Capture {
   const [engine, setEngineState] = useState<AsrProviderId>(() => (localStorage.getItem("sidebar.asr") as AsrProviderId) || "webspeech");
+  const [lang, setLangState] = useState<string>(() => localStorage.getItem("sidebar.lang") || "auto");
   const [mode, setModeState] = useState<MicMode>(() => (localStorage.getItem("sidebar.micmode") as MicMode) || "open");
   const [speechOn, setSpeechOn] = useState(false);
   const [talking, setTalking] = useState(false);
   const [level, setLevel] = useState(0);
   const [metric, setMetric] = useState<AsrMetrics | null>(null);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
   const [showVad, setShowVad] = useState(false);
+  const [, setWebgpuReady] = useState(false); // flip after the async WebGPU probe to enable the option
   const vadRef = useRef<GemmaVad>(loadVad());
   const [vad, setVadView] = useState<GemmaVad>(() => ({ ...vadRef.current }));
   const asrRef = useRef<AsrProvider | null>(null);
@@ -64,6 +72,9 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
   modeRef.current = mode;
 
   useEffect(() => () => asrRef.current?.stop(), []);
+  useEffect(() => {
+    void probeWebgpu().then(() => setWebgpuReady(true));
+  }, []);
 
   const setVad = (patch: Partial<GemmaVad>): void => {
     Object.assign(vadRef.current, patch);
@@ -75,6 +86,11 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
   const setEngine = (id: AsrProviderId): void => {
     setEngineState(id);
     localStorage.setItem("sidebar.asr", id);
+  };
+
+  const setLang = (l: string): void => {
+    setLangState(l);
+    localStorage.setItem("sidebar.lang", l);
   };
 
   const setMode = (m: MicMode): void => {
@@ -90,7 +106,7 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
 
   const startWith = async (id: AsrProviderId): Promise<void> => {
     setError("");
-    const provider = createAsrProvider(id, vadRef.current);
+    const provider = createAsrProvider(id, { vad: vadRef.current, lang });
     try {
       await provider.start({
         // Untagged — the server attributes by the WS connection's presence.
@@ -99,6 +115,7 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
         onError: (msg) => setError(msg),
         onLevel: (lvl) => setLevel(lvl),
         onMetrics: (m) => setMetric(m),
+        onStatus: (m) => setStatus(m.progress != null ? `${m.text} ${Math.round(m.progress)}%` : m.text),
       });
       asrRef.current = provider;
       setSpeechOn(true);
@@ -126,6 +143,7 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
     setTalking(false);
     setLevel(0);
     setMetric(null);
+    setStatus("");
   };
 
   const pttDown = (): void => {
@@ -168,11 +186,14 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
     talking,
     engine,
     setEngine,
+    lang,
+    setLang,
     mode,
     setMode,
     level,
     metric,
     error,
+    status,
     start,
     stop,
     pttDown,

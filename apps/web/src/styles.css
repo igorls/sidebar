@@ -114,6 +114,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);fon
 .micMode button.on{background:rgba(22,113,92,.12);color:var(--mint)}
 .micMode button+button{border-left:1px solid var(--border2)}
 .micBar .vadPanel.up{top:auto;bottom:48px}
+.micStatus{font-family:var(--mono);font-size:10px;color:var(--blue);white-space:nowrap}
 .shareUrl{height:30px;display:inline-flex;align-items:center;border:1px solid rgba(52,92,156,.3);border-radius:8px;background:rgba(52,92,156,.06);color:var(--blue);font-family:var(--mono);font-size:10px;text-decoration:none;padding:0 10px;white-space:nowrap}
 .capError{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--red);font-family:var(--mono);font-size:10px}
 .watchDock{display:flex;align-items:center;gap:8px;color:var(--muted);font-family:var(--mono);font-size:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);padding:6px 10px;white-space:nowrap}
