@@ -176,6 +176,8 @@ export class WhisperWebgpuProvider implements AsrProvider {
     if (m.type === "progress") {
       const p = (m.data as { progress?: number } | undefined)?.progress;
       this.cb?.onStatus?.({ text: `loading ${whisperModelMeta(this.modelKey).label}…`, progress: typeof p === "number" ? p : undefined });
+    } else if (m.type === "note") {
+      this.cb?.onStatus?.({ text: m.text || "" });
     } else if (m.type === "ready") {
       this.ready = true;
       this.cb?.onStatus?.({ text: "Whisper ready", progress: 100 });
@@ -221,7 +223,7 @@ export class WhisperWebgpuProvider implements AsrProvider {
 }
 
 interface WorkerMsg {
-  type: "progress" | "ready" | "result" | "error";
+  type: "progress" | "ready" | "result" | "error" | "note";
   data?: unknown;
   id?: number;
   text?: string;

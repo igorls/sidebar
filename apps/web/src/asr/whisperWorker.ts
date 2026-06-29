@@ -31,6 +31,17 @@ const cfg = env as unknown as { allowLocalModels: boolean; allowRemoteModels: bo
 cfg.allowLocalModels = false;
 cfg.allowRemoteModels = true;
 
+/** fp16 ONNX ops need the WebGPU `shader-f16` feature; not all GPUs/drivers expose it. */
+async function gpuHasShaderF16(): Promise<boolean> {
+  try {
+    const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<{ features?: { has(f: string): boolean } } | null> } }).gpu;
+    const adapter = gpu ? await gpu.requestAdapter() : null;
+    return !!adapter?.features?.has("shader-f16");
+  } catch {
+    return false;
+  }
+}
+
 async function getPipeline(progress?: (x: unknown) => void): Promise<Transcriber> {
   if (!loadCfg) throw new Error("Whisper model not configured");
   transcriber ??= await makePipeline("automatic-speech-recognition", loadCfg.id, {
@@ -46,7 +57,15 @@ ctx.onmessage = async (e: MessageEvent) => {
   if (msg.type === "load") {
     try {
       const meta = whisperModelMeta(msg.model);
-      loadCfg = { id: meta.id, dtype: meta.dtype };
+      const dtype: Record<string, string> = { ...meta.dtype };
+      // fp16 needs shader-f16; if the GPU/driver lacks it, requestDevice fails instantly.
+      // Fall back to fp32 encoder (larger, but loads) rather than erroring out.
+      if ((dtype.encoder_model === "fp16" || dtype.decoder_model_merged === "fp16") && !(await gpuHasShaderF16())) {
+        if (dtype.encoder_model === "fp16") dtype.encoder_model = "fp32";
+        if (dtype.decoder_model_merged === "fp16") dtype.decoder_model_merged = "q4";
+        ctx.postMessage({ type: "note", text: "GPU lacks shader-f16 — using fp32 (larger download)" });
+      }
+      loadCfg = { id: meta.id, dtype };
       const p = await getPipeline((x) => ctx.postMessage({ type: "progress", data: x }));
       await p(new Float32Array(16000), { task: "transcribe", chunk_length_s: 30 }); // warm WebGPU shaders
       ctx.postMessage({ type: "ready" });
