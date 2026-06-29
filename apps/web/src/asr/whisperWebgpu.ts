@@ -1,5 +1,6 @@
 import type { AsrCallbacks, AsrProvider } from "./types";
 import { GEMMA_VAD_DEFAULTS, type GemmaVad } from "./gemmaLocal";
+import { whisperModelMeta } from "./whisperModels";
 
 /**
  * On-device, multilingual ASR on the PARTICIPANT'S OWN GPU: an energy-VAD (same as
@@ -60,6 +61,7 @@ export class WhisperWebgpuProvider implements AsrProvider {
   constructor(
     private vad: GemmaVad = { ...GEMMA_VAD_DEFAULTS },
     private lang?: string,
+    private modelKey?: string,
   ) {}
 
   setMuted(muted: boolean): void {
@@ -87,8 +89,9 @@ export class WhisperWebgpuProvider implements AsrProvider {
     this.worker = worker;
     worker.onmessage = (e) => this.onWorker(e.data as WorkerMsg);
     worker.onerror = () => cb.onError("Whisper worker error");
-    cb.onStatus?.({ text: "loading Whisper model…", progress: 0 });
-    worker.postMessage({ type: "load" });
+    const meta = whisperModelMeta(this.modelKey);
+    cb.onStatus?.({ text: `loading ${meta.label} (${meta.size})…`, progress: 0 });
+    worker.postMessage({ type: "load", model: this.modelKey });
 
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
@@ -172,7 +175,7 @@ export class WhisperWebgpuProvider implements AsrProvider {
     if (this.stopped) return;
     if (m.type === "progress") {
       const p = (m.data as { progress?: number } | undefined)?.progress;
-      this.cb?.onStatus?.({ text: "loading Whisper model…", progress: typeof p === "number" ? p : undefined });
+      this.cb?.onStatus?.({ text: `loading ${whisperModelMeta(this.modelKey).label}…`, progress: typeof p === "number" ? p : undefined });
     } else if (m.type === "ready") {
       this.ready = true;
       this.cb?.onStatus?.({ text: "Whisper ready", progress: 100 });

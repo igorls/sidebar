@@ -5,6 +5,7 @@ import {
   webSpeechAvailable,
   probeWebgpu,
   GEMMA_VAD_DEFAULTS,
+  DEFAULT_WHISPER_MODEL,
   type AsrProvider,
   type AsrProviderId,
   type AsrMetrics,
@@ -23,6 +24,8 @@ export interface Capture {
   setEngine: (id: AsrProviderId) => void;
   lang: string;
   setLang: (l: string) => void;
+  whisperModel: string;
+  setWhisperModel: (m: string) => void;
   mode: MicMode;
   setMode: (m: MicMode) => void;
   level: number;
@@ -56,6 +59,7 @@ const isTyping = (el: Element | null): boolean =>
 export function useCapture(send: (e: ClientEvent) => void): Capture {
   const [engine, setEngineState] = useState<AsrProviderId>(() => (localStorage.getItem("sidebar.asr") as AsrProviderId) || "webspeech");
   const [lang, setLangState] = useState<string>(() => localStorage.getItem("sidebar.lang") || "auto");
+  const [whisperModel, setWhisperModelState] = useState<string>(() => localStorage.getItem("sidebar.whispermodel") || DEFAULT_WHISPER_MODEL);
   const [mode, setModeState] = useState<MicMode>(() => (localStorage.getItem("sidebar.micmode") as MicMode) || "open");
   const [speechOn, setSpeechOn] = useState(false);
   const [talking, setTalking] = useState(false);
@@ -93,6 +97,11 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
     localStorage.setItem("sidebar.lang", l);
   };
 
+  const setWhisperModel = (m: string): void => {
+    setWhisperModelState(m);
+    localStorage.setItem("sidebar.whispermodel", m);
+  };
+
   const setMode = (m: MicMode): void => {
     setModeState(m);
     modeRef.current = m;
@@ -106,7 +115,7 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
 
   const startWith = async (id: AsrProviderId): Promise<void> => {
     setError("");
-    const provider = createAsrProvider(id, { vad: vadRef.current, lang });
+    const provider = createAsrProvider(id, { vad: vadRef.current, lang, whisperModel });
     try {
       await provider.start({
         // Untagged — the server attributes by the WS connection's presence.
@@ -188,6 +197,8 @@ export function useCapture(send: (e: ClientEvent) => void): Capture {
     setEngine,
     lang,
     setLang,
+    whisperModel,
+    setWhisperModel,
     mode,
     setMode,
     level,

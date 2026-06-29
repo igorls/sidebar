@@ -8,12 +8,15 @@ export type { AsrProvider, AsrProviderId, AsrProviderMeta, AsrCallbacks, AsrMetr
 export { webSpeechAvailable } from "./webspeech";
 export { GEMMA_VAD_DEFAULTS, type GemmaVad } from "./gemmaLocal";
 export { probeWebgpu, webgpuAvailableCached } from "./whisperWebgpu";
+export { WHISPER_MODELS, DEFAULT_WHISPER_MODEL, type WhisperModelMeta } from "./whisperModels";
 
 export interface CreateAsrOpts {
   /** Mutated by the UI to retune the Gemma VAD live. */
   vad?: GemmaVad;
   /** BCP-47 language, or "auto"/undefined to let the engine auto-detect (Web Speech can't). */
   lang?: string;
+  /** Whisper model tier key (base | small | large-v3-turbo) for the whisper-webgpu engine. */
+  whisperModel?: string;
 }
 
 export function createAsrProvider(id: AsrProviderId, opts: CreateAsrOpts = {}): AsrProvider {
@@ -25,7 +28,7 @@ export function createAsrProvider(id: AsrProviderId, opts: CreateAsrOpts = {}): 
     case "gemma-local":
       return new GemmaLocalProvider(opts.vad ?? { ...GEMMA_VAD_DEFAULTS });
     case "whisper-webgpu":
-      return new WhisperWebgpuProvider(opts.vad ?? { ...GEMMA_VAD_DEFAULTS }, lang);
+      return new WhisperWebgpuProvider(opts.vad ?? { ...GEMMA_VAD_DEFAULTS }, lang, opts.whisperModel);
     case "webspeech":
     default:
       // Web Speech needs an explicit BCP-47 lang; undefined -> the browser's language.

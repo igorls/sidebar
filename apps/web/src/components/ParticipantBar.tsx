@@ -1,5 +1,5 @@
 import type { SidebarState } from "../ws";
-import { asrProviders, GEMMA_VAD_DEFAULTS, type AsrProviderId } from "../asr";
+import { asrProviders, GEMMA_VAD_DEFAULTS, WHISPER_MODELS, type AsrProviderId } from "../asr";
 import type { Capture } from "../useCapture";
 
 /** Where each engine sends your audio — surfaced so participants can pick a private path. */
@@ -64,6 +64,22 @@ export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarSta
             </option>
           ))}
         </select>
+        {cap.engine === "whisper-webgpu" ? (
+          <select
+            className="asrSelect"
+            value={cap.whisperModel}
+            disabled={cap.speechOn}
+            onChange={(e) => cap.setWhisperModel(e.target.value)}
+            aria-label="Whisper model"
+            title="Bigger = more accurate (esp. multilingual), but a larger one-time download and a stronger GPU"
+          >
+            {WHISPER_MODELS.map((m) => (
+              <option key={m.key} value={m.key}>
+                {m.label} ({m.size})
+              </option>
+            ))}
+          </select>
+        ) : null}
         <span className={"micPriv " + priv.tone} title={priv.tone === "private" ? "audio stays on the host" : `audio goes to ${priv.note}`}>
           {priv.tone === "private" ? "● private" : "● cloud"} · {priv.note}
         </span>

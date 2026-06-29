@@ -7,9 +7,7 @@
  *       { type:"result", id, text, transcribeMs } | { type:"error", id?, message }
  */
 import { pipeline, env } from "@huggingface/transformers";
-
-// Multilingual base (NO ".en"). Decoder MUST be q4 — q8/int8 = gibberish on WebGPU.
-const MODEL_ID = "onnx-community/whisper-base";
+import { whisperModelMeta } from "./whisperModels";
 
 const LANG_TO_WHISPER: Record<string, string> = {
   en: "english",
@@ -24,6 +22,7 @@ const LANG_TO_WHISPER: Record<string, string> = {
 
 type Transcriber = (audio: Float32Array, opts: Record<string, unknown>) => Promise<{ text?: string } | { text?: string }[]>;
 let transcriber: Transcriber | null = null;
+let loadCfg: { id: string; dtype: Record<string, string> } | null = null;
 
 const ctx = self as unknown as { postMessage(m: unknown): void; onmessage: ((e: MessageEvent) => void) | null };
 // Loose-typed handles — the lib's option types vary across versions; we drive it by docs.
@@ -33,18 +32,21 @@ cfg.allowLocalModels = false;
 cfg.allowRemoteModels = true;
 
 async function getPipeline(progress?: (x: unknown) => void): Promise<Transcriber> {
-  transcriber ??= await makePipeline("automatic-speech-recognition", MODEL_ID, {
+  if (!loadCfg) throw new Error("Whisper model not configured");
+  transcriber ??= await makePipeline("automatic-speech-recognition", loadCfg.id, {
     device: "webgpu",
-    dtype: { encoder_model: "fp32", decoder_model_merged: "q4" },
+    dtype: loadCfg.dtype,
     progress_callback: progress,
   });
   return transcriber;
 }
 
 ctx.onmessage = async (e: MessageEvent) => {
-  const msg = e.data as { type: string; audio?: Float32Array; lang?: string; id?: number };
+  const msg = e.data as { type: string; audio?: Float32Array; lang?: string; id?: number; model?: string };
   if (msg.type === "load") {
     try {
+      const meta = whisperModelMeta(msg.model);
+      loadCfg = { id: meta.id, dtype: meta.dtype };
       const p = await getPipeline((x) => ctx.postMessage({ type: "progress", data: x }));
       await p(new Float32Array(16000), { task: "transcribe", chunk_length_s: 30 }); // warm WebGPU shaders
       ctx.postMessage({ type: "ready" });
