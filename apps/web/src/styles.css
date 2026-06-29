@@ -79,6 +79,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);fon
 .vadRow input[type=range]{width:100%;height:3px;accent-color:var(--mint);cursor:pointer}
 .vadRow b{color:var(--text);text-align:right;font-weight:500}
 .vadMetric{margin-top:2px;font-family:var(--mono);font-size:9.5px;line-height:1.5;color:var(--mint);background:var(--bg2);border:1px solid var(--border2);border-radius:7px;padding:7px 9px}
+.vadCal{font-family:var(--mono);font-size:9.5px;color:var(--muted);padding:0 2px}
+.vadCal.hot{color:var(--green)}
 /* ── Meeting lock (password gate over the public funnel) ──────────────── */
 .lockScreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:100}
 .lockCard{display:flex;flex-direction:column;gap:12px;width:296px;padding:26px 24px;background:var(--panel2);border:1px solid var(--border2);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.28)}

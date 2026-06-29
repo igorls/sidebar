@@ -27,6 +27,7 @@ export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarSta
   const providers = asrProviders();
   const self = state.presence.find((p) => p.id === state.selfId);
   const priv = PRIVACY[cap.engine];
+  const usesVad = cap.engine === "gemma-local" || cap.engine === "whisper-webgpu"; // engines with the client energy VAD
   return (
     <footer className="micBar">
       <div className="micGroup">
@@ -66,9 +67,9 @@ export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarSta
         <span className={"micPriv " + priv.tone} title={priv.tone === "private" ? "audio stays on the host" : `audio goes to ${priv.note}`}>
           {priv.tone === "private" ? "● private" : "● cloud"} · {priv.note}
         </span>
-        {cap.engine === "gemma-local" ? (
-          <button className={"capBtn" + (cap.showVad ? " on" : "")} onClick={() => cap.setShowVad(!cap.showVad)} title="On-device VAD latency knobs">
-            VAD
+        {usesVad ? (
+          <button className={"capBtn" + (cap.showVad ? " on" : "")} onClick={() => cap.setShowVad(!cap.showVad)} title="Noise floor + segmentation">
+            Noise floor
           </button>
         ) : null}
       </div>
@@ -121,13 +122,21 @@ export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarSta
         {cap.error ? <span className="capError">{cap.error}</span> : null}
       </div>
 
-      {cap.engine === "gemma-local" && cap.showVad ? (
+      {usesVad && cap.showVad ? (
         <div className="vadPanel up">
           <div className="vadHead">
-            <span>on-device VAD · latency</span>
+            <span>noise floor + segmentation</span>
             <button className="vadReset" onClick={() => cap.setVad({ ...GEMMA_VAD_DEFAULTS })}>
               reset
             </button>
+          </div>
+          <label className="vadRow">
+            <span>noise floor</span>
+            <input type="range" min={4} max={80} step={1} value={Math.round(cap.vad.startRms * 1000)} onChange={(e) => cap.setVad({ startRms: +e.target.value / 1000 })} />
+            <b>{cap.vad.startRms.toFixed(3)}</b>
+          </label>
+          <div className={"vadCal" + (cap.level > cap.vad.startRms ? " hot" : "")}>
+            mic now {cap.level.toFixed(3)} — {cap.level > cap.vad.startRms ? "▲ above floor (captures)" : "below floor (ignored)"}
           </div>
           <label className="vadRow">
             <span>finalize silence</span>
@@ -138,11 +147,6 @@ export function ParticipantBar({ cap, state }: { cap: Capture; state: SidebarSta
             <span>max segment</span>
             <input type="range" min={2000} max={15000} step={500} value={cap.vad.maxUtterMs} onChange={(e) => cap.setVad({ maxUtterMs: +e.target.value })} />
             <b>{(cap.vad.maxUtterMs / 1000).toFixed(1)}s</b>
-          </label>
-          <label className="vadRow">
-            <span>mic onset</span>
-            <input type="range" min={4} max={50} step={1} value={Math.round(cap.vad.startRms * 1000)} onChange={(e) => cap.setVad({ startRms: +e.target.value / 1000 })} />
-            <b>{cap.vad.startRms.toFixed(3)}</b>
           </label>
           <div className="vadMetric">
             {cap.metric
