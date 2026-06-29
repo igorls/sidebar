@@ -1,14 +1,97 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { ClientEvent } from "@sidebar/shared";
 import type { SidebarState } from "../ws";
 import { SCENARIOS } from "../scenarios";
 import { CustomSelect } from "./CustomSelect";
 
+const DEFAULT_RAIL_ROWS = [1.8, 1, 0.7];
+const MIN_PANEL_HEIGHTS = [180, 150, 120];
+const KEY_RESIZE_STEP = 24;
+
 export function Rail({ state, hostMode, send }: { state: SidebarState; hostMode: boolean; send: (e: ClientEvent) => void }) {
+  const railRef = useRef<HTMLElement>(null);
+  const [rows, setRows] = useState(DEFAULT_RAIL_ROWS);
+
+  const getPanelHeights = useCallback(() => {
+    const panels = railRef.current?.querySelectorAll<HTMLElement>(".panel");
+    const heights = panels ? Array.from(panels, (panel) => panel.getBoundingClientRect().height) : [];
+    return heights.length === 3 ? heights : rows;
+  }, [rows]);
+
+  const resizePair = useCallback((dividerIndex: number, delta: number, baseHeights: number[]) => {
+    const next = [...baseHeights];
+    const pairTotal = baseHeights[dividerIndex] + baseHeights[dividerIndex + 1];
+    const minA = Math.min(MIN_PANEL_HEIGHTS[dividerIndex], pairTotal / 2);
+    const minB = Math.min(MIN_PANEL_HEIGHTS[dividerIndex + 1], pairTotal - minA);
+    const nextA = Math.max(minA, Math.min(baseHeights[dividerIndex] + delta, pairTotal - minB));
+
+    next[dividerIndex] = nextA;
+    next[dividerIndex + 1] = pairTotal - nextA;
+    setRows(next);
+  }, []);
+
+  const startResize = useCallback(
+    (dividerIndex: number, clientY: number) => {
+      const startY = clientY;
+      const startHeights = getPanelHeights();
+      const onPointerMove = (event: PointerEvent) => {
+        resizePair(dividerIndex, event.clientY - startY, startHeights);
+      };
+      const onPointerUp = () => {
+        document.removeEventListener("pointermove", onPointerMove);
+        document.removeEventListener("pointerup", onPointerUp);
+        document.removeEventListener("pointercancel", onPointerUp);
+        document.body.classList.remove("resizingRail");
+      };
+
+      document.body.classList.add("resizingRail");
+      document.addEventListener("pointermove", onPointerMove);
+      document.addEventListener("pointerup", onPointerUp, { once: true });
+      document.addEventListener("pointercancel", onPointerUp, { once: true });
+    },
+    [getPanelHeights, resizePair],
+  );
+
+  const resizeWithKeyboard = (dividerIndex: number, event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    resizePair(dividerIndex, event.key === "ArrowDown" ? KEY_RESIZE_STEP : -KEY_RESIZE_STEP, getPanelHeights());
+  };
+
   return (
-    <aside className="rail">
+    <aside className="rail" ref={railRef} style={{ gridTemplateRows: `${rows[0]}fr 12px ${rows[1]}fr 12px ${rows[2]}fr` }}>
       <Transcript state={state} hostMode={hostMode} send={send} />
+      <div
+        className="railResize"
+        role="separator"
+        aria-label="Resize live transcript and rolling summary"
+        aria-orientation="horizontal"
+        tabIndex={0}
+        title="Drag to resize"
+        onDoubleClick={() => setRows(DEFAULT_RAIL_ROWS)}
+        onKeyDown={(event) => resizeWithKeyboard(0, event)}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          startResize(0, event.clientY);
+        }}
+      />
       <Summary state={state} />
+      <div
+        className="railResize"
+        role="separator"
+        aria-label="Resize rolling summary and fact-check"
+        aria-orientation="horizontal"
+        tabIndex={0}
+        title="Drag to resize"
+        onDoubleClick={() => setRows(DEFAULT_RAIL_ROWS)}
+        onKeyDown={(event) => resizeWithKeyboard(1, event)}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          startResize(1, event.clientY);
+        }}
+      />
       <FactCheck state={state} />
     </aside>
   );
