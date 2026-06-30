@@ -51,12 +51,14 @@ services:
     env_file: .env
     environment:
       - PORT=3001
+      - EXPORTS_DIR=/app/exports
       # If you use the local-Gemma ASR or the GPU A/B baseline, point these at your host
       # (localhost inside the container is the container, not your machine):
       - OLLAMA_URL=http://host.docker.internal:11434
       - BASELINE_BASE_URL=http://host.docker.internal:11434
     volumes:
       - ./:/app
+      - ./exports:/app/exports
       # Anonymous volumes preserve the image's Linux node_modules instead of the host's
       # Windows-built ones leaking in through the bind-mount above.
       - /app/node_modules

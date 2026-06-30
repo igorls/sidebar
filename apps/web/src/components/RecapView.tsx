@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import type { ClientEvent } from "@sidebar/shared";
+import type { ClientEvent, ExportFileInfo } from "@sidebar/shared";
 import type { SidebarState } from "../ws";
+import { getKey } from "../auth";
 
 /**
  * The terminal post-meeting view shown to EVERYONE (host + guests) on the same link
@@ -23,6 +24,9 @@ export function RecapView({
   const drafting = !doc || doc.status === "building";
   const failed = doc?.status === "done" && !doc.html.trim(); // server should prevent this; guard anyway
   const renderedHtml = useMemo(() => (doc?.html ? normalizeRecapHtml(doc.html) : ""), [doc?.html]);
+  const exportFiles = useMemo(() => orderedExportFiles(state.exports.files), [state.exports.files]);
+  const recapFile = exportFiles.find((file) => file.kind === "recap");
+  const manifestFile = state.exports.files.find((file) => file.kind === "manifest");
 
   const download = (): void => {
     if (!renderedHtml) return;
@@ -57,9 +61,20 @@ export function RecapView({
         </div>
         <div className="recapActions">
           {!drafting ? (
-            <button className="capBtn" onClick={download} data-tip="Download the recap as HTML">
-              Download
-            </button>
+            recapFile ? (
+              <a className="capBtn" href={exportHref(recapFile.url)} download data-tip="Download the saved host copy">
+                Download recap
+              </a>
+            ) : (
+              <button className="capBtn" onClick={download} data-tip="Download the recap as HTML">
+                Download recap
+              </button>
+            )
+          ) : null}
+          {manifestFile ? (
+            <a className="capBtn" href={exportHref((manifestFile ?? exportFiles[0])!.url)} download data-tip="Download the export manifest">
+              Manifest
+            </a>
           ) : null}
           {hostMode ? (
             <button
@@ -81,6 +96,7 @@ export function RecapView({
         </div>
       </header>
       <div className="recapBody">
+        {exportFiles.length ? <ExportPanel root={state.exports.root} files={exportFiles} /> : null}
         {renderedHtml ? (
           <iframe className="recapFrame" sandbox="allow-scripts" srcDoc={renderedHtml} title="Meeting recap" />
         ) : failed ? (
@@ -96,6 +112,63 @@ export function RecapView({
       </div>
     </div>
   );
+}
+
+function ExportPanel({ root, files }: { root: string; files: ExportFileInfo[] }) {
+  return (
+    <aside className="recapExports" aria-label="Meeting exports">
+      <div className="exportKicker">Saved exports</div>
+      <div className="exportRoot" title={root}>
+        {root}
+      </div>
+      <div className="exportList">
+        {files.map((file) => (
+          <a key={file.id} className="exportFile" href={exportHref(file.url)} download>
+            <span>{labelFor(file.kind)}</span>
+            <b>{file.name}</b>
+            <i>{formatBytes(file.size)}</i>
+          </a>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function orderedExportFiles(files: ExportFileInfo[]): ExportFileInfo[] {
+  const order: Record<string, number> = { recap: 0, prototype: 1, design: 2, summary: 3, transcript: 4, manifest: 5, readme: 6 };
+  return [...files].sort((a, b) => (order[a.kind] ?? 9) - (order[b.kind] ?? 9) || a.name.localeCompare(b.name));
+}
+
+function exportHref(url: string): string {
+  const key = getKey();
+  if (!key) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}key=${encodeURIComponent(key)}`;
+}
+
+function labelFor(kind: ExportFileInfo["kind"]): string {
+  switch (kind) {
+    case "recap":
+      return "Recap";
+    case "prototype":
+      return "Prototype";
+    case "design":
+      return "Design DNA";
+    case "summary":
+      return "Summary";
+    case "transcript":
+      return "Transcript";
+    case "manifest":
+      return "Manifest";
+    case "readme":
+      return "Readme";
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const RECAP_NORMALIZE_CSS = `<style id="sidebar-recap-viewer-css">

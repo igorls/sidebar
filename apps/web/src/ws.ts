@@ -16,6 +16,7 @@ import {
   type ParticipantPresence,
   type CursorPing,
   type ContextSnapshot,
+  type ExportSnapshot,
   type InviteInfo,
 } from "@sidebar/shared";
 import { getKey, clearKey } from "./auth";
@@ -93,6 +94,7 @@ export interface SidebarState {
   presence: ParticipantPresence[];
   pings: PresencePing[];
   context: ContextSnapshot;
+  exports: ExportSnapshot;
   scenarioId?: string;
   running: boolean;
   capture: { screen: boolean; speech: boolean; lastFrameTs?: number; host?: string };
@@ -129,6 +131,7 @@ const initial: SidebarState = {
   presence: [],
   pings: [],
   context: { meetingId: "", workspaceRoot: "", items: [] },
+  exports: { meetingId: "", root: "", startedAt: 0, updatedAt: 0, files: [] },
   running: false,
   capture: { screen: false, speech: false },
   seq: 1,
@@ -220,6 +223,8 @@ function reducer(s: SidebarState, a: Action): SidebarState {
       return { ...s, context: { ...s.context, items: upsertContext(s.context.items, ev.item) } };
     case "context.updated":
       return { ...s, context: { ...s.context, items: upsertContext(s.context.items, ev.item) } };
+    case "export.snapshot":
+      return { ...s, exports: ev.exports };
     case "capture.status":
       return {
         ...s,
@@ -479,6 +484,7 @@ function reducer(s: SidebarState, a: Action): SidebarState {
         latencyMs: null,
         ended: null,
         finalDoc: null,
+        exports: { meetingId: "", root: "", startedAt: 0, updatedAt: 0, files: [] },
       };
     default:
       return s;
